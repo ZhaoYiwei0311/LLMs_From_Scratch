@@ -205,3 +205,7 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# GPT2
+gpt2/
+model/gpt_model.pth

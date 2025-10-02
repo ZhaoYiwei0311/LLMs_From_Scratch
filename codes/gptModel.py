@@ -1,3 +1,4 @@
+
 import torch
 import torch.nn as nn
 import sys
@@ -5,7 +6,8 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from selfAttention import MultiHeadAttention
 from config import GPT_CONFIG_124M
-
+from utils import calc_loss_batch
+from utils import evaluate_model, generate_and_print_sample
 class DummyGRTModel(nn.Module):
     def __init__(self, config=GPT_CONFIG_124M):
         super().__init__()
@@ -142,32 +144,6 @@ class TransformerBlock(nn.Module):
         x = self.dropout_shortcut(x)
         x = x + shortcut
         return x
-    
-# class GPTModel(nn.Module):
-#     def __init__(self, config):
-#         super().__init__()
-#         self.tok_emb = nn.Embedding(config["vocab_size"], config["emb_dim"])
-#         self.pos_emb = nn.Embedding(config["context_length"], config["emb_dim"])
-#         self.drop_emb = nn.Dropout(config["drop_rate"])
-        
-#         self.trf_blocks = nn.Sequential(*[TransformerBlock(config) for _ in range(config["n_layers"])])
-        
-#         self.final_norm = LayerNorm(config["emb_dim"])
-#         self.out_head = nn.Linear(config["emb_dim"], config["vocab_size"], bias=False)
-        
-#     def forward(self, in_idx):
-#         batch_size, seq_len = in_idx.shape
-#         tok_embeds = self.tok_emb(in_idx)
-        
-#         pos_embeds = self.pos_emb(torch.arange(seq_len, device=in_idx.device))
-#         x = tok_embeds + pos_embeds
-#         x = self.drop_emb(x)
-        
-#         x = self.trf_blocks(x)
-#         x = self.final_norm(x)
-#         logits = self.out_head(x)
-#         return logits
-
 class GPTModel(nn.Module):
     def __init__(self, cfg):
         super().__init__()
@@ -191,16 +167,31 @@ class GPTModel(nn.Module):
         x = self.final_norm(x)
         logits = self.out_head(x)
         return logits
+
+def train_model_simple(model, train_loader, val_loader, optimizer, device, num_epochs, eval_freq, eval_iter, start_context, tokenizer):
+    train_losses, val_losses, track_tokens_seen = [], [], []
+    tokens_seen, global_step = 0, -1
     
-def generate_text_simple(model, idx, max_new_tokens, context_size):
-    for _ in range(max_new_tokens): 
-        idx_cond = idx[:, -context_size:] 
-        with torch.no_grad(): 
-            logits = model(idx_cond)
+    for epoch in range(num_epochs):
+        model.train()
+        for input_batch, target_batch in train_loader:
+            optimizer.zero_grad()
+            loss = calc_loss_batch(input_batch, target_batch, model, device)
+            loss.backward()
+            optimizer.step()
+            tokens_seen += input_batch.shape[1]
+            global_step += 1
+
+            if global_step % eval_freq == 0:
+                train_loss, val_loss = evaluate_model( 
+                    model, train_loader, val_loader, device, eval_iter) 
+                train_losses.append(train_loss) 
+                val_losses.append(val_loss) 
+                track_tokens_seen.append(tokens_seen) 
+                print(f"Ep {epoch+1} (Step {global_step:06d}): " 
+                      f"Train loss {train_loss:.3f}, " 
+                      f"Val loss {val_loss:.3f}" 
+                )
             
-        # Only focus on the last output
-        logits = logits[:, -1, :] 
-        probas = torch.softmax(logits, dim=-1) 
-        idx_next = torch.argmax(probas, dim=-1, keepdim=True) 
-        idx = torch.cat((idx, idx_next), dim=1) 
-    return idx
+            generate_and_print_sample(model, tokenizer, device, start_context)
+    return train_losses, val_losses, track_tokens_seen
