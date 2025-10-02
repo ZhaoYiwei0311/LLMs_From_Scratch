@@ -1,3 +1,6 @@
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from dataLoader import create_dataloader_v1
 
 with open("data/the-verdict.txt", "r", encoding="utf-8") as f: 

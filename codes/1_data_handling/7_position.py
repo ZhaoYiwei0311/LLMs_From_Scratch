@@ -1,5 +1,5 @@
 import torch
-from dataLoader import create_dataloader_v1
+from codes.dataLoader import create_dataloader_v1
 
 with open("data/the-verdict.txt", "r", encoding="utf-8") as f: 
     raw_text = f.read() 
