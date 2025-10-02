@@ -208,4 +208,4 @@ __marimo__/
 
 # GPT2
 gpt2/
-model/gpt_model.pth
+model/

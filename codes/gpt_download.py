@@ -128,6 +128,63 @@ def download_file(url, destination):
 """
 
 
+def load_gpt2_from_directory(model_dir):
+    """
+    Load GPT-2 settings and parameters from an existing model directory.
+    
+    Args:
+        model_dir (str): Path to the directory containing GPT-2 model files
+        
+    Returns:
+        tuple: (settings, params) where settings is a dict with model hyperparameters
+               and params is a dict with model parameters
+               
+    Raises:
+        FileNotFoundError: If required model files are not found
+        ValueError: If model directory structure is invalid
+    """
+    # Check if model directory exists
+    if not os.path.exists(model_dir):
+        raise FileNotFoundError(f"Model directory not found: {model_dir}")
+    
+    # Required files for loading
+    required_files = ["hparams.json", "model.ckpt.index", "model.ckpt.meta", "model.ckpt.data-00000-of-00001"]
+    
+    # Check if all required files exist
+    missing_files = []
+    for filename in required_files:
+        file_path = os.path.join(model_dir, filename)
+        if not os.path.exists(file_path):
+            missing_files.append(filename)
+    
+    if missing_files:
+        raise FileNotFoundError(f"Missing required files: {missing_files}")
+    
+    try:
+        # Load settings from hparams.json
+        hparams_path = os.path.join(model_dir, "hparams.json")
+        with open(hparams_path, "r", encoding="utf-8") as f:
+            settings = json.load(f)
+        
+        # Find the TensorFlow checkpoint path
+        tf_ckpt_path = tf.train.latest_checkpoint(model_dir)
+        if tf_ckpt_path is None:
+            raise ValueError("No valid TensorFlow checkpoint found in the model directory")
+        
+        # Load parameters from checkpoint
+        params = load_gpt2_params_from_tf_ckpt(tf_ckpt_path, settings)
+        
+        print(f"Successfully loaded GPT-2 model from: {model_dir}")
+        print(f"Model size: {settings.get('n_layer', 'unknown')} layers, {settings.get('n_embd', 'unknown')} embedding dimensions")
+        
+        return settings, params
+        
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON in hparams.json: {e}")
+    except Exception as e:
+        raise ValueError(f"Error loading model from directory {model_dir}: {e}")
+
+
 def load_gpt2_params_from_tf_ckpt(ckpt_path, settings):
     # Initialize parameters dictionary with empty blocks for each layer
     params = {"blocks": [{} for _ in range(settings["n_layer"])]}

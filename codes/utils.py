@@ -5,6 +5,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import GPT_CONFIG_124M
 import numpy as np
+import pandas as pd
 
 def text_to_token_ids(text, tokenizer):
     encoded = tokenizer.encode(text, allowed_special={"<|endoftext|>"})
@@ -14,14 +15,6 @@ def text_to_token_ids(text, tokenizer):
 def token_ids_to_text(token_ids, tokenizer):
     flat = token_ids.squeeze(0)
     return tokenizer.decode(flat.tolist())
-
-# def calc_loss_batch(input_batch, target_batch, model, device):
-#     input_batch = input_batch.to(device)
-#     target_batch = target_batch.to(device)
-#     logits = model(input_batch)
-#     loss = torch.nn.functional.cross_entropy(
-#         logits.flatten(0, 1), target_batch.flatten())
-#     return loss
 
 def calc_loss_batch(input_batch, target_batch, model, device):
     input_batch, target_batch = input_batch.to(device), target_batch.to(device)
@@ -179,3 +172,14 @@ def load_weights_into_gpt(gpt, params):
     gpt.final_norm.shift = assign(gpt.final_norm.shift, params["b"])
     gpt.out_head.weight = assign(gpt.out_head.weight, params["wte"])
     gpt.out_head.weight = assign(gpt.out_head.weight, params["wte"])
+    
+def create_balanced_dataset(df): 
+    num_spam = df[df["Label"] == "spam"].shape[0] 
+    ham_subset = df[df["Label"] == "ham"].sample( 
+        num_spam, random_state=123 
+    ) 
+    balanced_df = pd.concat([ 
+        ham_subset, df[df["Label"] == "spam"] 
+    ]) 
+    return balanced_df 
+
