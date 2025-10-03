@@ -72,21 +72,24 @@ def generate(model, idx, max_new_tokens, context_size,
 
         if top_k is not None:
             top_logits, _ = torch.topk(logits, top_k)
-            min_val = top_logits[:, -1] 
-            logits = torch.where( 
-                logits < min_val, 
-                torch.tensor(float('-inf')).to(logits.device), 
-                logits 
+            min_val = top_logits[:, -1]
+            logits = torch.where(
+                logits < min_val,
+                torch.tensor(float('-inf')).to(logits.device),
+                logits
             )
-            if temperature > 0.0:
-                logits = logits / temperature 
-                probs = torch.softmax(logits, dim=-1) 
-                idx_next = torch.multinomial(probs, num_samples=1) 
-            else:
-                idx_next = torch.argmax(logits, dim=-1, keepdim=True) 
-            if idx_next == eos_id:
-                break
-            idx = torch.cat((idx, idx_next), dim=1) 
+
+        if temperature > 0.0:
+            logits = logits / temperature
+            probs = torch.softmax(logits, dim=-1)
+            idx_next = torch.multinomial(probs, num_samples=1)
+        else:
+            idx_next = torch.argmax(logits, dim=-1, keepdim=True)
+
+        if idx_next == eos_id:
+            break
+
+        idx = torch.cat((idx, idx_next), dim=1)
     return idx
 
 def generate_and_print_sample(model, tokenizer, device, start_context):
@@ -182,4 +185,15 @@ def create_balanced_dataset(df):
         ham_subset, df[df["Label"] == "spam"] 
     ]) 
     return balanced_df 
+
+def format_input(entry): 
+    instruction_text = ( 
+        f"Below is an instruction that describes a task. " 
+        f"Write a response that appropriately completes the request." 
+        f"\n\n### Instruction:\n{entry['instruction']}" 
+    ) 
+    input_text = ( 
+        f"\n\n### Input:\n{entry['input']}" if entry["input"] else "" 
+    ) 
+    return instruction_text + input_text
 
